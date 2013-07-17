@@ -1,0 +1,7 @@
+name = Basic aggregation on S3
+description = Aggregate Javascript and CSS and put them onto Amazon S3.
+package = "Performance and scalability"
+core = 7.x
+dependencies[] = awssdk
+; configure = 
+version = "7.x-1.0"
