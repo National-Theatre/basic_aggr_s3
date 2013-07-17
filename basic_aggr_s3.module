@@ -345,3 +345,71 @@ function basic_aggr_s3_build_js_cache($files) {
   }
   return $uri;
 }
+
+function basic_aggr_s3_build_parse_modules(&$folders) {
+    $modules = variable_get('basic_aggr_s3_modules', array());
+    foreach ($modules AS $module) {
+        $folders[] = drupal_get_path('module', $module);
+    }
+}
+
+function basic_aggr_s3_build_parse_themes(&$folders) {
+    $themes = theme_get_registry();
+    foreach ($themes AS $theme) {
+        $folders[] = $theme;
+    }
+}
+
+function basic_aggr_s3_build_parse_folders($folders) {
+    $data = cache_get('basic_aggr_s3_files');
+    if ($data === FALSE) {
+        $result = db_select('', 'c')
+                ->fields('c')
+                ->execute()
+                ->fetchAllAssoc('path');
+        cache_set('basic_aggr_s3_files', $result);
+    }
+    $options = array(
+        'key'     => 'uri',
+        'recurse' => TRUE,
+    );
+    $mask = variable_get('basic_aggr_s3_mask', '/\.png$/');
+    foreach ($folders as $folder) {
+        foreach (file_scan_directory($folder, $mask, $options) AS $file) {
+            basic_aggr_s3_build_file_upload($file);
+        }
+    }
+}
+
+function basic_aggr_s3_build_file_upload($file) {
+  $whirlpool = hash_file('whirlpool', $file, TRUE);
+  $filename = basename(file_uri_target($file));
+  $s3_path = 's3://' . $file;
+  $data = cache_get('basic_aggr_s3_files');
+  if ($data === FALSE) {
+      return FALSE;
+  }
+  $list = $data->data;
+  if (key_exists($s3_path, $list)) {
+      if ($list[$s3_path]['whirlpool'] == $whirlpool) {
+          return TRUE;
+      }
+      $query = db_update('')
+              ->condition('path', $s3_path);
+  }
+  else {
+      $query = db_insert('');
+  }
+  $path = file_unmanaged_copy($file, $s3_path, FILE_EXISTS_REPLACE);
+  $query->fields(
+    array(
+      'whirlpool' => $whirlpool,
+      'filename'  => $filename,
+      'path'      => $path,
+      'md5'       => hash_file('md5', $file, TRUE),
+      'delete'    => 0,
+      'changed'   => time(),
+    )
+  )->execute();
+  return TRUE;
+}
