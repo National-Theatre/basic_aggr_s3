@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * @copyright The Royal National Theatre
@@ -13,12 +14,14 @@ function basic_aggr_s3_element_info_alter(&$types) {
     $types['styles']['#aggregate_callback'] = 'basic_aggr_s3_aggregate_css';
   }
 }
+
 /**
  * Implements hook_js_alter().
  */
 function basic_aggr_s3_js_alter(&$javascripts) {
   basic_aggr_s3_get_js($javascripts);
 }
+
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -36,7 +39,7 @@ function basic_aggr_s3_get_js($javascript = NULL) {
   $items = array();
   foreach ($javascript as $key => $item) {
 //    if ($item['scope'] == $scope) {
-      $items[$key] = $item;
+    $items[$key] = $item;
 //    }
   }
 
@@ -84,7 +87,6 @@ function basic_aggr_s3_get_js($javascript = NULL) {
 //  if ($scope == 'header' && isset($items['settings'])) {
 //    $items['settings']['data'][] = $setting;
 //  }
-
   // Loop through the JavaScript to construct the rendered output.
   $element = array(
     '#tag' => 'script',
@@ -94,7 +96,7 @@ function basic_aggr_s3_get_js($javascript = NULL) {
     ),
   );
   foreach ($items as $item) {
-    $query_string =  empty($item['version']) ? $default_query_string : $js_version_string . $item['version'];
+    $query_string = empty($item['version']) ? $default_query_string : $js_version_string . $item['version'];
 
     switch ($item['type']) {
       case 'setting':
@@ -167,12 +169,14 @@ function basic_aggr_s3_get_js($javascript = NULL) {
     }
   }
 }
+
 /**
  * CSS aggregation into bundle.
  */
 function basic_aggr_s3_css_bundle(&$css_groups) {
   $css_groups = basic_aggr_s3_aggregate_css($css_groups);
 }
+
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -204,6 +208,7 @@ function basic_aggr_s3_aggregate_css(&$css_groups) {
     }
   }
 }
+
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -286,6 +291,7 @@ function basic_aggr_s3_build_css_cache($css) {
   }
   return $uri;
 }
+
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -346,70 +352,125 @@ function basic_aggr_s3_build_js_cache($files) {
   return $uri;
 }
 
+/**
+ * Implements hook_cron().
+ */
+function basic_aggr_s3_cron() {
+  $folders = array(
+    'misc',
+  );
+  basic_aggr_s3_build_parse_themes($folders);
+  basic_aggr_s3_build_parse_modules($folders);
+  basic_aggr_s3_build_parse_folders($folders);
+}
+
+/**
+ * Gets all the base folders for your enabled modules.
+ *
+ * @param array $folders
+ *   List of folders to parse.
+ */
 function basic_aggr_s3_build_parse_modules(&$folders) {
-    $modules = variable_get('basic_aggr_s3_modules', array());
-    foreach ($modules AS $module) {
-        $folders[] = drupal_get_path('module', $module);
-    }
+  $modules = module_list();
+  foreach ($modules AS $module) {
+    $folders[] = drupal_get_path('module', $module);
+  }
 }
 
+/**
+ * Gets all the base folders for your enabled themes.
+ *
+ * @param array $folders
+ *   List of folders to parse.
+ */
 function basic_aggr_s3_build_parse_themes(&$folders) {
-    $themes = theme_get_registry();
-    foreach ($themes AS $theme) {
-        $folders[] = $theme;
+  $themes = list_themes();
+  foreach ($themes AS $name => $theme) {
+    if ($theme->status || variable_get('admin_theme', FALSE) == $name) {
+      $folders[] = drupal_get_path('theme', $name);
     }
+  }
 }
-
+/**
+ * Parse folder list to find files to upload.
+ *
+ * @param array $folders
+ *   List of folders to parse.
+ */
 function basic_aggr_s3_build_parse_folders($folders) {
-    $data = cache_get('basic_aggr_s3_files');
-    if ($data === FALSE) {
-        $result = db_select('', 'c')
-                ->fields('c')
-                ->execute()
-                ->fetchAllAssoc('path');
-        cache_set('basic_aggr_s3_files', $result);
+  $result = db_select('basic_aggr_s3_files', 'c')
+    ->fields('c')
+    ->execute()
+    ->fetchAllAssoc('path');
+  cache_set('basic_aggr_s3_files', $result, 'cache', time() + 15 * 60);
+  $options = array(
+    'key' => 'uri',
+    'recurse' => TRUE,
+  );
+  $mask = variable_get(
+    'basic_aggr_s3_mask',
+    '/\.png|\.jpe?g|\.gif|\.ico|\.woff|\.svg|\.ttf|\.otf\.eot$/'
+  );
+  foreach ($folders as $folder) {
+    $files = file_scan_directory($folder, $mask, $options);
+    foreach (array_keys($files) AS $file) {
+      basic_aggr_s3_build_file_upload($file);
     }
-    $options = array(
-        'key'     => 'uri',
-        'recurse' => TRUE,
-    );
-    $mask = variable_get('basic_aggr_s3_mask', '/\.png$/');
-    foreach ($folders as $folder) {
-        foreach (file_scan_directory($folder, $mask, $options) AS $file) {
-            basic_aggr_s3_build_file_upload($file);
-        }
-    }
+  }
 }
-
+/**
+ * Upload a given file to S3 and log it to DB.
+ *
+ * @param string $file
+ *   File to upload to S3.
+ *
+ * @return boolean
+ *   Success of failure flag.
+ */
 function basic_aggr_s3_build_file_upload($file) {
-  $whirlpool = hash_file('whirlpool', $file, TRUE);
-  $filename = basename(file_uri_target($file));
+  $file_path = DRUPAL_ROOT . '/' . $file;
+  $whirlpool = hash_file('whirlpool', $file_path, TRUE);
+  $filename = basename($file_path);
   $s3_path = 's3://' . $file;
   $data = cache_get('basic_aggr_s3_files');
   if ($data === FALSE) {
-      return FALSE;
+    return FALSE;
   }
   $list = $data->data;
   if (key_exists($s3_path, $list)) {
-      if ($list[$s3_path]['whirlpool'] == $whirlpool) {
-          return TRUE;
-      }
-      $query = db_update('')
-              ->condition('path', $s3_path);
+    if ($list[$s3_path]->whirlpool == $whirlpool) {
+      return TRUE;
+    }
+  }
+  drupal_mkdir(dirname($s3_path), NULL, TRUE);
+  watchdog('S3', 'Update:' . $s3_path);
+  $path = file_unmanaged_copy($file_path, $s3_path, FILE_EXISTS_REPLACE);
+  if ($path) {
+    db_merge('basic_aggr_s3_files')
+      ->insertFields(array(
+        'whirlpool' => $whirlpool,
+        'filename'  => $filename,
+        'path'      => $path,
+        'md5'       => hash_file('md5', $file_path, TRUE),
+        'deleted'   => 0,
+        'changed'   => time(),
+        'created'   => time(),
+      ))
+      ->key(array('path' => $s3_path))
+      ->fields(
+        array(
+          'whirlpool' => $whirlpool,
+          'filename'  => $filename,
+          'path'      => $path,
+          'md5'       => hash_file('md5', $file_path, TRUE),
+          'deleted'   => 0,
+          'changed'   => time(),
+        )
+      )
+      ->execute();
+    return TRUE;
   }
   else {
-      $query = db_insert('');
+    return FALSE;
   }
-  $path = file_unmanaged_copy($file, $s3_path, FILE_EXISTS_REPLACE);
-  $query->fields(
-    array(
-      'whirlpool' => $whirlpool,
-      'filename'  => $filename,
-      'path'      => $path,
-      'md5'       => hash_file('md5', $file, TRUE),
-      'delete'    => 0,
-      'changed'   => time(),
-    )
-  )->execute();
-  return TRUE;
 }

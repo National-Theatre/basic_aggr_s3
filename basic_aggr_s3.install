@@ -4,3 +4,77 @@
  * @copyright The Royal National Theatre
  * @author John-Paul Drawneek
  */
+
+/**
+ * Implements hook_schema().
+ */
+function basic_aggr_s3_schema() {
+  $schema = array();
+  $schema['basic_aggr_s3_files'] = array(
+    'description' => t('List of files uploaded to a S3 bucket.'),
+    'fields' => array(
+      'whirlpool' => array(
+        'type' => 'blob',
+        'length' => 64,
+        'not null' => TRUE,
+        'mysql_type' => 'BINARY(64)',
+      ),
+      'filename'  => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'mysql_type' => 'varchar(255) CHARACTER SET utf8 COLLATE utf8_bin',
+      ),
+      'path'      => array(
+        'description' => 'Path of file uploaded to s3.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'md5'       => array(
+        'type' => 'blob',
+        'length' => 16,
+        'not null' => TRUE,
+        'mysql_type' => 'BINARY(16)',
+      ),
+      'deleted'    => array(
+        'description' => 'Boolean indicating whether the file has been marked for deletetion.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'created'   => array(
+        'description' => 'The Unix timestamp when the node was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed'   => array(
+        'description' => 'The Unix timestamp when the node was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('path'),
+    'unique keys' => array(
+      'whirlpool' => array('whirlpool', 'path'),
+    ),
+    'indexes' => array(
+      'date'   => array('created', 'changed'),
+      'delete' => array('deleted'),
+    ),
+  );
+  return $schema;
+}
+/**
+ * Implements hook_enable().
+ */
+function basic_aggr_s3_enable() {
+  $folders = array(
+    'misc',
+  );
+  basic_aggr_s3_build_parse_themes($folders);
+  basic_aggr_s3_build_parse_modules($folders);
+  basic_aggr_s3_build_parse_folders($folders);
+}
