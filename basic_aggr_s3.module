@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * @copyright The Royal National Theatre
@@ -14,14 +13,22 @@ function basic_aggr_s3_element_info_alter(&$types) {
     $types['styles']['#aggregate_callback'] = 'basic_aggr_s3_aggregate_css';
   }
 }
-
 /**
  * Implements hook_js_alter().
  */
 function basic_aggr_s3_js_alter(&$javascripts) {
-  basic_aggr_s3_get_js($javascripts);
+  $scopes = &drupal_static(__FUNCTION__);
+  if (!isset($scopes)) {
+    $tmp = array();
+    foreach ($javascripts AS $js) {
+      $tmp[$js['scope']] = 1;
+    }
+    $scopes = array_keys($tmp);
+  }
+  foreach ($scopes AS $scope) {
+    basic_aggr_s3_get_js($javascripts, $scope);
+  }
 }
-
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -30,7 +37,7 @@ function basic_aggr_s3_js_alter(&$javascripts) {
  *
  * @see drupal_get_js().
  */
-function basic_aggr_s3_get_js($javascript = NULL) {
+function basic_aggr_s3_get_js($javascript = NULL, $scope = 'header') {
   if (!isset($javascript)) {
     $javascript = drupal_add_js();
   }
@@ -38,9 +45,9 @@ function basic_aggr_s3_get_js($javascript = NULL) {
   // Filter out elements of the given scope.
   $items = array();
   foreach ($javascript as $key => $item) {
-//    if ($item['scope'] == $scope) {
-    $items[$key] = $item;
-//    }
+    if ($item['scope'] == $scope) {
+      $items[$key] = $item;
+    }
   }
 
   $output = '';
@@ -169,14 +176,12 @@ function basic_aggr_s3_get_js($javascript = NULL) {
     }
   }
 }
-
 /**
  * CSS aggregation into bundle.
  */
 function basic_aggr_s3_css_bundle(&$css_groups) {
   $css_groups = basic_aggr_s3_aggregate_css($css_groups);
 }
-
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -208,7 +213,6 @@ function basic_aggr_s3_aggregate_css(&$css_groups) {
     }
   }
 }
-
 /**
  * Straight rip from common.inc but uses S3.
  *
@@ -291,7 +295,6 @@ function basic_aggr_s3_build_css_cache($css) {
   }
   return $uri;
 }
-
 /**
  * Straight rip from common.inc but uses S3.
  *
