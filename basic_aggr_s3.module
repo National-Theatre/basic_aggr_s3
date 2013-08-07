@@ -273,7 +273,12 @@ function basic_aggr_s3_build_css_cache($css) {
     // starting with "ad*".
     $filename = 'css_' . drupal_hash_base64($data) . '.css';
     // Create the css/ within the files folder.
-    $csspath = 's3://css';
+    $directory_path = str_replace(
+      '/public',
+      '',
+      file_stream_wrapper_get_instance_by_uri('public://')->getDirectoryPath()
+    );
+    $csspath = 's3://' . $directory_path . '/css';
     $uri = $csspath . '/' . $filename;
     // Create the CSS file.
     file_prepare_directory($csspath, FILE_CREATE_DIRECTORY);
@@ -333,7 +338,12 @@ function basic_aggr_s3_build_js_cache($files) {
     // starting with "ad*".
     $filename = 'js_' . drupal_hash_base64($contents) . '.js';
     // Create the js/ within the files folder.
-    $jspath = 's3://js';
+    $directory_path = str_replace(
+      '/public',
+      '',
+      file_stream_wrapper_get_instance_by_uri('public://')->getDirectoryPath()
+    );
+    $jspath = 's3://' . $directory_path . '/js';
     $uri = $jspath . '/' . $filename;
     // Create the JS file.
     file_prepare_directory($jspath, FILE_CREATE_DIRECTORY);
