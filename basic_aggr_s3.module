@@ -364,7 +364,6 @@ function basic_aggr_s3_build_js_cache($files) {
   }
   return $uri;
 }
-
 /**
  * Implements hook_cron().
  */
@@ -376,7 +375,6 @@ function basic_aggr_s3_cron() {
   basic_aggr_s3_build_parse_modules($folders);
   basic_aggr_s3_build_parse_folders($folders);
 }
-
 /**
  * Gets all the base folders for your enabled modules.
  *
@@ -389,7 +387,6 @@ function basic_aggr_s3_build_parse_modules(&$folders) {
     $folders[] = drupal_get_path('module', $module);
   }
 }
-
 /**
  * Gets all the base folders for your enabled themes.
  *
