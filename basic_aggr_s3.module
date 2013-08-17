@@ -1,10 +1,27 @@
 <?php
 /**
  * @file
+ * basic_aggr_s3.module
  * @copyright The Royal National Theatre
  * @author John-Paul Drawneek
  */
 
+/**
+ * Implements hook_menu().
+ */
+function basic_aggr_s3_menu() {
+  return array(
+    'admin/config/system/refresh-s3' => array(
+      'title'            => 'Refresh assets stored in S3',
+      'description'      => 'Core assets are uploaded to S3 which can be refresh via this form.',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('basic_aggr_s3_force_refresh_form'),
+      'access arguments' => array('access administration pages'),
+      'type'             => MENU_NORMAL_ITEM,
+      'file'             => 'basic_aggr_s3.batch.inc',
+    ),
+  );
+}
 /**
  * Implements hook_element_info_alter().
  */
@@ -412,7 +429,6 @@ function basic_aggr_s3_build_parse_folders($folders) {
     ->fields('c')
     ->execute()
     ->fetchAllAssoc('path');
-  cache_set('basic_aggr_s3_files', $result, 'cache', time() + 15 * 60);
   $options = array(
     'key' => 'uri',
     'recurse' => TRUE,
@@ -424,7 +440,7 @@ function basic_aggr_s3_build_parse_folders($folders) {
   foreach ($folders as $folder) {
     $files = file_scan_directory($folder, $mask, $options);
     foreach (array_keys($files) AS $file) {
-      basic_aggr_s3_build_file_upload($file);
+      basic_aggr_s3_build_file_upload($file, $result);
     }
   }
 }
@@ -437,16 +453,11 @@ function basic_aggr_s3_build_parse_folders($folders) {
  * @return boolean
  *   Success of failure flag.
  */
-function basic_aggr_s3_build_file_upload($file) {
+function basic_aggr_s3_build_file_upload($file, $list) {
   $file_path = DRUPAL_ROOT . '/' . $file;
   $whirlpool = hash_file('whirlpool', $file_path, TRUE);
   $filename = basename($file_path);
   $s3_path = 's3://' . $file;
-  $data = cache_get('basic_aggr_s3_files');
-  if ($data === FALSE) {
-    return FALSE;
-  }
-  $list = $data->data;
   if (key_exists($s3_path, $list)) {
     if ($list[$s3_path]->whirlpool == $whirlpool) {
       return TRUE;
