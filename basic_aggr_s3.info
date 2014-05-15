@@ -3,5 +3,6 @@ description = Aggregate Javascript and CSS and put them onto Amazon S3.
 package = "Performance and scalability"
 core = 7.x
 dependencies[] = awssdk
+dependencies[] = amazons3
 ; configure = 
 version = "7.x-1.0"
