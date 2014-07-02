@@ -496,18 +496,18 @@ function basic_aggr_s3_build_file_upload($file, $list) {
   }
 }
 /**
- * Implements hook_amazons3_url_info().
+ * Implements hook_amazons3_save_headers().
  */
-function hook_amazons3_url_info($local_path, $info) {
+function basic_aggr_s3_amazons3_save_headers($local_path, $info) {
   if (strpos($local_path, 'css/css_') !== FALSE) {
-    $cache_time = 60 * 60 * 24 * 7;
+    $cache_time = 60 * 60 * 24 * 7 * 52;
     $info['response'] = array(
       'Cache-Control' => 'max-age=' . $cache_time . ', public',
       'Expires' => gmdate('D, d M Y H:i:s', time() + $cache_time) . ' GMT',
     );
   }
   if (strpos($local_path, 'js/js_') !== FALSE) {
-    $cache_time = 60 * 60 * 24 * 7;
+    $cache_time = 60 * 60 * 24 * 7 * 52;
     $info['response'] = array(
       'Cache-Control' => 'max-age=' . $cache_time . ', public',
       'Expires' => gmdate('D, d M Y H:i:s', time() + $cache_time) . ' GMT',
